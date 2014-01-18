@@ -70,7 +70,7 @@ TMP=${TMP:-/tmp}
 #
 # TAG is the package tag for the repo you chose above.  The default is
 # 'SBo' but you can change this to a custom tag if you use spkg with a
-# custom repo.  Only used by the -l switch.
+# custom repo.  Only used by the -l, -u, and -w switches.
 TAG=${TAG:-SBo}
 #
 # WGETFLAGS are command-line flags passed to wget.
@@ -578,6 +578,7 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -r            Parse the list of REQUIRES for a package in \$REPOPATH.
     -s            Search for a package in \$REPOPATH.
     -u            Upgrade installed packages in \$REPOPATH.
+    -w            Write a queuefile based on installed \$REPOPATH packages.
 EOF
 }
 

@@ -51,5 +51,6 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -r            Parse the list of REQUIRES for a package in $REPOPATH.
     -s            Search for a package in $REPOPATH.
     -u            Upgrade installed packages in $REPOPATH.
+    -w            Write a queuefile based on installed $REPOPATH packages.
 
 Enjoy!
