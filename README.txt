@@ -47,8 +47,8 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -i            Download and install a package in $REPOPATH.
     -l            List installed packages in $REPOPATH.
     -p            Print the .info and README for a package in $REPOPATH.
-    -q            Download and install repo packages in a /path/to/queuefile.
-    -r            Parse the list of REQUIRES for a package in $REPOPATH.
+    -q            Download and install packages in a /path/to/queuefile.
+    -r            Print the list of REQUIRES for a package in $REPOPATH.
     -s            Search for a package in $REPOPATH.
     -u            Upgrade installed packages in $REPOPATH.
     -w            Write a queuefile based on installed $REPOPATH packages.
