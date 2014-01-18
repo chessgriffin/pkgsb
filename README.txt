@@ -21,18 +21,18 @@ lines so it is far smaller than sbopkg.
 
 Hopefully, it should be fairly self-explanatory.  The only required changes
 are to edit the $REPOPATH and $SOURCEDIR variables at the top of the script.
-The $SPKGDIR variable is option but might be useful.  The $SPKGDIR directory
+The $SPKGDIR variable is optional but might be useful.  The $SPKGDIR directory
 is where you can save edited copies of the SlackBuild script or the .info file
 or save build options that can be passed to a SlackBuild script in a *.options
-file (e.g. openbox.options).  Think of this as an "override" directory.
-Anything here will be sourced after sourcing the actual SlackBuild script or
-the .info file in the repository.
+file (e.g. openbox.options).  Think of this as an "override" directory where
+you can save edited files without touching the actual repo.  Anything here
+will be sourced after sourcing the actual SlackBuild script or the .info file
+in the repository.
 
-As you can see, spkg does not handle the actual syncing of the repo.  I
-figured that the user can do this outside of spkg, either with rsync, or git,
-or ftp or whatever you need.  The user can probably write a wrapper script
-around spkg in fact to handle the syncing.  Again, spkg is supposed to be
-'simple'.  :-)
+spkg does not handle the actual syncing of the repo.  I figured that the user
+can do this outside of spkg, either with rsync, or git, or ftp or whatever the
+user needs.  The user can probably write a wrapper script around spkg in fact
+to handle the syncing.  Again, spkg is supposed to be 'simple'.  :-)
 
 spkg supports sbopkg-style queuefile with the exception that it does not read
 build options passed in the queuefile after the pipe ('|') character.  Save
