@@ -9,15 +9,15 @@ helpful to Slackware users who want a way to easily manage the process of
 building and installing third-party software from SlackBuilds.org and other
 similar repositories of SlackBuild scripts.
 
-However, I also wanted try creating something simpler to use and maintain.
+However, I also wanted to try creating something simpler to use and maintain.
 This was the basis for working on spkg.  It is not a replacement for sbopkg
 per se and it does not have all the features of sbopkg.  But, it works for me
 and if it works for you, then that's cool.
 
-spkg is just a single Bash script of less than 700 lines (and a good chunk of
-that is the license, the user configuration section, and the usage and help
-functions).  The actual working part of the script is probably about 575
-lines so it is far smaller than sbopkg.
+spkg is just a single Bash script of about 700 lines (and a good chunk of that
+is the license, the user configuration section, and the usage and help
+functions).  The actual working part of the script is probably about 575 lines
+so it is far smaller than sbopkg.
 
 Hopefully, it should be fairly self-explanatory.  The only required changes
 are to edit the $REPOPATH and $SOURCEDIR variables at the top of the script.
