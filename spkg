@@ -1,0 +1,695 @@
+#!/bin/bash
+#
+# spkg - a simple slackbuild script package builder
+#
+# Copyright 2013-2014 Chess Griffin <chess@chessgriffin.com>
+#
+# with bits from sbopkg which is:
+# Copyright 2007-2010, 2013 Chess Griffin <chess@chessgriffin.com
+# Copyright 2009-2011 Mauro Giachero <mauro.giachero@gmail.com>
+#                     slakmagik <slakmagik@gmail.com>
+#
+# Redistributions of this script must retain the above copyright notice,
+# this list of conditions and the following disclaimer.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR "AS IS" AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+#  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+#  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+#  STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+#  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+### START USER CONFIGURATION SECTION ###
+# This section is where you can set certain variables for spkg.  These
+# variables can also be exported in your environment.
+#
+# FLAGS:
+#
+# GET_REQUIRES=1 means spkg will parse the REQUIRES= line in the .info file
+# and try to build all the dependencies found in the right order.  0 means it
+# will ignore the REQUIRES= line.  You can pass this and the other flags at
+# the command line, e.g.: $ GET_REQUIRES=0 spkg -i "app1 app2".
+GET_REQUIRES=${GET_REQUIRES:-1}
+#
+# INSTALL=1 means packages will be installed as they are built; 0 means the
+# packages will only be built and not installed (which may not work depending
+# on whether some of the packages are dependencies of others).
+INSTALL=${INSTALL:-1}
+#
+# DIRECTORIES:
+#
+# OUTPUT is where built packages are saved.
+OUTPUT=${OUTPUT:-/tmp}
+#
+# REPOPATH is the directory of where your SBo or other repository is located.
+REPOPATH=${REPOPATH:-/var/lib/sbopkg/SBo/14.1}
+#REPOPATH=${REPOPATH:-/home/chess/gitstuff/slackbuilds}
+#
+# SOURCEDIR is where downloaded source files are saved.  Needs to be writable
+# by the user running the script.
+SOURCEDIR=${SOURCEDIR:-/home/chess/sources}
+#
+# SPKGDIR is the 'override' directory where you can put copies of SlackBuild
+# scripts and .info files and these will be sourced before building any
+# packages.  This way you can make changes to these files without touching
+# your repo directory.  You can also save build options to be passed to the
+# SlackBuild script in a simple text file named <package>.options with all
+# options on one line separated by spaces.
+SPKGDIR=${SPKGDIR:-/home/chess/spkg}
+#
+# TMP is the temp directory.  A working directory will be created in $TMP.
+# Needs to be writable by the user running the script.
+TMP=${TMP:-/tmp}
+#
+# OTHER:
+#
+# TAG is the package tag for the repo you chose above.  The default is
+# 'SBo' but you can change this to a custom tag if you use spkg with a
+# custom repo.  Only used by the -l switch.
+TAG=${TAG:-SBo}
+#
+# WGETFLAGS are command-line flags passed to wget.
+WGETFLAGS="${WGETFLAGS:--c --progress=bar:force -nv --timeout=30 --tries=5}"
+#
+### END USER CONFIGURATION SECTION ###
+
+### NO CHANGES SHOULD BE NECESSARY BELOW THIS LINE ###
+
+# Functions
+
+ask_continue () {
+  echo
+  while true; do
+    read -ep "Continue? (y/n) "
+    case $REPLY in
+      Y|y)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  done
+}
+
+build_pkgs () {
+  # The loop to build packages in BUILDFILE.
+  local BP_BLD BP_BLDOPT BP_PACKAGE BP_SAVEOUTPUT BP_SRCE
+  unset PKGPATH
+
+  cleanecho "\nspkg starting on $(date)\n"
+  cleanecho "Building packages:"
+  for BP_BLD in $(cat $BUILDFILE); do
+    search_pkg "$BP_BLD"
+    # If we have an SBo rsync directory, then there is probably a tarball of
+    # each SlackBuild in which case let's untar it into TMPDIR.
+    if [[ -e $PKGPATH.tar.gz ]]; then
+      cleanecho "Extracting tarball to work directory."
+      tar zxvf $PKGPATH.tar.gz -C "$TMPDIR"
+    else
+      # Otherwise, just copy the package directory.
+      cleanecho "Copying directory to work directory."
+      cp -a $PKGPATH $TMPDIR
+    fi
+    source_info "$BP_BLD" "build"
+    cd "$TMPDIR"/"$BP_BLD"
+    for BP_SRCE in ${SOURCES[@]}; do
+      cleanecho "Copying $BP_SRCE to work directory."
+      cp "$SOURCEDIR"/"$BP_SRCE" "$TMPDIR"/"$BP_BLD"
+    done
+    # Use any save options for the package found in the 'override' directory.
+    if [[ -e "$SPKGDIR"/"$BP_BLD".options ]]; then
+      BP_BLDOPT=$(< "$SPKGDIR"/"$BP_BLD".options)
+    else
+      unset BP_BLDOPT
+    fi
+    # We need to temporarily change OUTPUT to save the built package and make
+    # it easier to find and install if necessary.
+    BP_SAVEOUTPUT="$OUTPUT"
+    mkdir "$TMPDIR/$BP_BLD/output"
+    export OUTPUT="$TMPDIR/$BP_BLD/output"
+    cleanecho "Building $BP_BLD-$VERSION"
+    if ( export $BP_BLDOPT && sh "$TMPDIR"/"$BP_BLD"/"$BP_BLD".SlackBuild ); then
+      BP_PKG_RESULT="success"
+    else
+      BP_PKG_RESULT="error"
+    fi
+    RESULTS+="$BP_BLD:$BP_PKG_RESULT "
+    echo "Finished with $BP_BLD"
+    BP_PACKAGE=$(ls "$OUTPUT")
+    # Install the package if install was chosen.
+    if [[ ! -z $BP_PACKAGE ]]; then
+      if [[ $INSTALL == 1 ]]; then
+        upgradepkg --reinstall --install-new "$OUTPUT"/"$BP_PACKAGE"
+      fi
+      # Move the built package into the old OUTPUT.
+      cleanecho "Moving $BP_PACKAGE to $BP_SAVEOUTPUT."
+      mv "$OUTPUT"/"$BP_PACKAGE" "$BP_SAVEOUTPUT"
+    fi
+    OUTPUT="$BP_SAVEOUTPUT"
+    cd $CWD
+  done
+}
+
+check_installed () {
+  # Find installed packages.
+  local FI_PKG="$1"
+  local FI_CHECK FI_ITEM FI_INSTALLED_VER
+
+  FI_INSTALLED_VER=""
+  for FI_ITEM in $(ls /var/log/packages); do
+    FI_CHECK=${FI_ITEM%-*-*-*}
+    if [[ "$FI_CHECK" == "$FI_PKG" ]]; then
+      FI_INSTALLED_VER=$FI_ITEM
+      eval "INSTALLED_VER='$FI_INSTALLED_VER'"
+      return 0
+    fi
+  done
+  #FI_INSTALLED_VER=""
+  eval "INSTALLED_VER='$FI_INSTALLED_VER'"
+}
+
+check_root () {
+  if [[ $(id -u) != 0 ]]; then
+    cleanecho "The script must be run by the root user to build or install packages."
+    exit 1
+  fi
+}
+
+cleanecho () {
+  echo -e "$@" | tr -s ' ' | fmt -78
+}
+
+cleanup () {
+  if [[ -d $TMPDIR ]]; then
+    rm -rf $TMPDIR
+  fi
+  exit 0
+}
+
+download_source () {
+  # Download the sources that were added to the DOWNLOAD array.
+  local DS_PKG="$1"
+  local DS_i DS_MD5 DS_MD5CHK DS_SOURCEDL DS_SOURCEMD5 DS_SOURCEPKG
+
+  search_pkg "$DS_PKG"
+  source_info "$DS_PKG"
+  cleanecho "Sourcing the .info file for $DS_PKG found in $REPOTYPE."
+  DS_SOURCEDL=($DOWNLOAD)
+  DS_SOURCEMD5=($MD5SUM)
+  # Use x86_64 DOWNLOAD/MD5SUM combo if found.
+  if [[ $ARCH == "x86_64" && -n "$DOWNLOAD_x86_64" ]]; then
+    DS_SOURCEDL=($DOWNLOAD_x86_64)
+    DS_SOURCEMD5=($MD5SUM_x86_64)
+    if [[ "$DOWNLOAD_x86_64" == "UNSUPPORTED" ]]; then
+      cleanecho "Download error for $DS_PKG.  This package is unsupported. \
+        You can continue anyway using the 32 bit source if desired."
+      if ask_continue; then
+        DS_SOURCEDL=($DOWNLOAD)
+        DS_SOURCEMD5=($MD5SUM)
+      else
+        return 1
+      fi
+    fi
+  fi
+  cd $SOURCEDIR
+  for ((DS_i=0; DS_i<${#DS_SOURCEDL[*]}; DS_i++)); do
+    # Get the source filename and put it in SOURCEPKG.
+    DS_SOURCEPKG=$(echo "${DS_SOURCEDL[$DS_i]}" | sed 's/.*\///g')
+    if [[ ! -e "$DS_SOURCEPKG" ]]; then
+      cleanecho "Downloading: ${DS_SOURCEDL[$DS_i]}"
+      wget $WGETFLAGS "${DS_SOURCEDL[$DS_i]}"
+      # Bail if we have an error.
+      if [[ ! -e "$DS_SOURCEPKG" ]]; then
+        cleanecho "Download error for $DS_PKG."
+        cleanecho "Please manually download the source to $SOURCEDIR \
+          and try again."
+        cleanup
+      fi
+    else
+      cleanecho "Found file $DS_SOURCEPKG in $SOURCEDIR.  Not downloading."
+    fi
+    # Add SOURCEPKG to a new array called SOURCES used in build_pkgs.
+    SOURCES+="$DS_SOURCEPKG "
+    # Do an MD5 check unless we are only downloading.
+    if [[ -z $DOWNLOAD_ONLY ]]; then
+      DS_MD5="${DS_SOURCEMD5[$DS_i]}"
+      DS_MD5CHK=$(md5sum "$DS_SOURCEPKG" | cut -d' ' -f1)
+      if [[ "$DS_MD5" != "$DS_MD5CHK" ]]; then
+        cleanecho "Checksum failed for $DS_SOURCEPKG."
+        cat << EOF
+Expected: $DS_MD5 (in .info file)
+EOF
+        cat << EOF
+Found:    $DS_MD5CHK (downloaded $DS_SOURCEPKG)
+EOF
+        if ask_continue; then
+          break
+        else
+          cleanup
+        fi
+      else
+        cleanecho "Checksums match."
+      fi
+    fi
+  done
+  cd $CWD
+}
+
+get_sources () {
+  # Get the sources from the .info file and pass it to download_source.
+  local GS_SRCPKG
+
+  if [[ ! -w $SOURCEDIR ]]; then
+    cleanecho "The source directory $SOURCEDIR does not exist or is not \
+      writable by the user."
+    exit 1
+  fi
+  if [[ ! -s $BUILDFILE ]]; then
+    cleanecho "No packages to install."
+    cleanup
+  fi
+  echo
+  for GS_SRCPKG in $(cat $BUILDFILE); do
+    cleanecho "Checking for $GS_SRCPKG sources."
+    download_source "$GS_SRCPKG"
+  done
+  echo
+}
+
+get_installed () {
+  # Get installed packages with $TAG.
+  local GI_CHECK GI_ITEM GI_REV_ITEM
+  local INSTALLED_LIST=$TMPDIR/installed.tmp
+
+  PKG_ARRAY=""
+  for GI_ITEM in $(ls /var/log/packages | grep $TAG); do
+    printf "."
+    GI_CHECK=${GI_ITEM%-*-*-*}
+    echo "$GI_CHECK" >> $INSTALLED_LIST
+  done
+  for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
+    PKG_ARRAY+="$GI_REV_ITEM "
+    printf "."
+  done
+}
+
+help () {
+  usage
+  cat << EOF
+
+This script is designed to be used with a local copy of the SlackBuilds.org
+("SBo") repository, although it can also be used with any local repository of
+SlackBuild scripts.  Just change the REPOPATH and TAG variables at the top of
+the script.  However, for most purposes, this script assumes one is using it
+with the SBo repo.
+
+When processing packages, spkg will try and determine if the installed version
+of a package is different from the repo version and mark those as selected for
+upgrade in the dialog menu.  It is up to the admin to review the dialog menu
+and select or deselect the packages as necessary.  Note that packages
+appearing in the repo but installed from another source with a different \$TAG
+(e.g. _msb, _alien) will appear in the list so make sure you select or
+deselect the packages as necessary.
+
+Queuefiles are simply a text file with a list of packages, one per line.
+You can 'include' other queuefiles by putting a '@' at the start of a line
+followed by the path to the other queuefile.  Use full paths both in the -q
+option and in the queuefiles themselves when using '@'.
+
+See the SPKGDIR variable at the top of the script where you save 'overrides'
+for locally-edited SlackBuilds, .info files, or how you can save build options
+that are supported in a particular SlackBuild.
+
+Use double-quotes for multiple packages e.g.: spkg -i "package1 package2".
+
+Only one option (-d, -i, -q, etc.) should be used at a time.
+
+Certain options (-i, -q, and -u) require root privileges.
+EOF
+}
+
+load_queues () {
+  # Load an sbopkg-style queuefile.
+  local LQ_ALLQUEUES=("$1")
+  local LQ_FILE LQ_ITEM LQ_NEWITEM
+
+  PKG_ARRAY=""
+  for LQ_FILE in ${LQ_ALLQUEUES[@]}; do
+    if [[ -e "$LQ_FILE" ]]; then
+      while read LQ_ITEM; do
+        if skip_line $LQ_ITEM; then
+          continue
+        fi
+        # Remove options separated with a | - instead use *.options in $SPKGDIR.
+        LQ_ITEM=$(echo $LQ_ITEM | sed 's/|.*$//')
+        # Load recursive queuefiles that have a @ in front of the path.
+        if [[ "${LQ_ITEM:0:1}" = "@" ]]; then
+          LQ_NEW_ITEM=${LQ_ITEM#?}
+          load_queues "$LQ_NEW_ITEM"
+        else
+          PKG_ARRAY+="$LQ_ITEM "
+        fi
+      done < $LQ_FILE
+    else
+      cleanecho "Can't find queuefile: $LQ_FILE.  Use full path."
+    fi
+  done
+}
+
+make_workdir () {
+  TMPDIR=$(mktemp -p $TMP -d spkg.XXXXXX 2>/dev/null)
+  if [ $? -ne 0 ]; then
+    TMPDIR="$TMP/spkg.${RANDOM}"
+    mkdir -m 700 $TMPDIR || TMPDIR="FAILED"
+  fi
+  printf "Building package list"
+}
+
+parse_pkgarray () {
+  # Go through the REQUIRES to find all the packages.
+  local PP_PARSELIST=("$1")
+  local PP_APP="$2"
+  local PP_DEP PP_i PP_ITEM PP_ONOFF PP_SORT PP_VERCHK
+  BUILDFILE=$TMPDIR/build_requires.tmp
+  DEPFILE=$TMPDIR/dep_requires.tmp
+
+  touch $BUILDFILE $DEPFILE
+  for PP_DEP in ${PP_PARSELIST[@]}; do
+    printf "."
+    if search_pkg "$PP_DEP"; then
+      source_info "$PP_DEP"
+      REPO_VER=$VERSION
+      check_installed "$PP_DEP"
+      if [[ -z $INSTALLED_VER ]]; then
+        INSTALLED_VER="---"
+      else
+        PP_VERCHK=$(echo $INSTALLED_VER | rev | cut -d- -f3 | rev)
+      fi
+      if [[ "$REPO_VER" == "$PP_VERCHK" ]]; then
+        PP_ONOFF="OFF"
+      else
+        PP_ONOFF="ON"
+      fi
+      if [[ "$MENU" == "cli" ]]; then
+        echo "$PP_DEP|$REPO_VER|$INSTALLED_VER" >> $DEPFILE
+      else
+        echo "$PP_DEP-$REPO_VER|$INSTALLED_VER|$PP_ONOFF" >> $DEPFILE
+      fi
+      if [[ $GET_REQUIRES == 1 && ! -z $REQUIRES ]]; then
+        parse_pkgarray "$REQUIRES" "$PP_DEP"
+      fi
+    # If we find a %README$ add some info to the NOTES array.
+    elif [[ "$PP_DEP" == "%README%" ]]; then
+      if [[ -z "$NOTES" ]]; then
+        NOTES+="CAUTION!!! Found REQUIRES=%README%. See the README file for: "
+      fi
+      NOTES+="$PP_APP "
+    fi
+    for PP_SORT in $(tac $DEPFILE); do
+      if ! grep -q "$PP_SORT" $BUILDFILE; then
+        echo "$PP_SORT" >> $BUILDFILE
+      fi
+    done
+  done
+}
+
+print_buildlist () {
+  # print the buildlist in cli or dialog depending on the option used.
+  local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL
+
+  echo
+  #for PB_ITEM in $(tac $DEPFILE); do
+  #  if ! grep -q "$PB_ITEM" $BUILDFILE; then
+  #    echo "$PB_ITEM" >> $BUILDFILE
+  #  fi
+  #done
+  if [[ $MENU == "cli" ]]; then
+    awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
+    "Installed Version"; }'
+    awk 'BEGIN {printf "%-25s %-13s %-25s\n", "-------", "------------", \
+    "-----------------"; }'
+    #cat $BUILDFILE
+    PB_COUNTER=0
+    for PB_PRINT in $(cat $BUILDFILE); do
+      PB_NAME=$(echo $PB_PRINT | cut -d'|' -f1)
+      PB_REPO=$(echo $PB_PRINT | cut -d'|' -f2)
+      PB_INSTLD=$(echo $PB_PRINT | cut -d'|' -f3)
+      awk -v PB_N="$PB_NAME" -v PB_R="$PB_REPO" -v PB_I="$PB_INSTLD" \
+        'BEGIN {printf "%-25s %-13s %-25s\n", PB_N, PB_R, PB_I; }'
+      PB_COUNTER=$((PB_COUNTER+1))
+    done
+    cleanecho "Total packages: $PB_COUNTER"
+    if [[ ! -z $NOTES ]]; then
+      cleanecho "$NOTES"
+    fi
+  else
+    sed -i "s/|/ /g" $BUILDFILE
+    while :; do
+      dialog --separate-output --title "spkg" --backtitle "$NOTES" \
+        --checklist "Select which packages to process. Repo version is in \
+the left column and installed version is shown in the right column. \
+spkg tries to pre-select only those packages for which a newer version is in \
+the repo but the admin is strongly advised to double-check what is selected \
+and what is not selected. Note also that packages in the repo but installed \
+from other sources with different \$TAGS (e.g. _msb, _alien) may be listed \
+so be sure of your selections. Finally, if spkg finds a %README% then a \
+CAUTION note will be displayed at the top of the screen." \
+        20 0 15 --file $BUILDFILE 2> $TMPDIR/final_list.tmp
+      CHOICE=$?
+      case $CHOICE in
+        0)  rm $BUILDFILE
+            for PB_FINAL in $(cat $TMPDIR/final_list.tmp); do
+              echo "$PB_FINAL" | rev | cut -d- -f2-7 | rev >> $BUILDFILE
+            done
+            return
+            ;;
+        1)  cleanup
+            ;;
+      esac
+    done
+  fi
+}
+
+print_info () {
+  # Print the .info and README for a package.
+  local SR_READLIST=("$1")
+  local SR_ITEM
+
+  for SR_ITEM in ${SR_READLIST[@]}; do
+    if search_pkg $SR_ITEM; then
+      more "$PKGPATH"/*.info
+      echo
+      more "$PKGPATH"/README
+    fi
+  done
+}
+
+search_list () {
+  # Search for the packages given on the command line.
+  local SL_SRCHLIST=("$1")
+  local SL_i SL_ITEM SL_SRCHPKG
+
+  for SL_ITEM in ${SL_SRCHLIST[@]}; do
+    cleanecho "Searching for \"$SL_ITEM\":"
+    if search_pkg "$SL_ITEM" "general"; then
+      for ((SL_i=0; SL_i<${#PKGPATH[*]}; SL_i++)); do
+        echo ${PKGPATH[$SL_i]}
+      done
+      echo
+    else
+      cleanecho "Cannot find $SL_ITEM."
+    fi
+  done
+}
+
+search_pkg () {
+  # This is a search that will find any filename globs or by specific filename.
+  local SP_SEARCHPKG="$1"
+  local SP_TYPE="$2"
+
+  if [[ ! -z $SP_TYPE ]]; then
+    PKGPATH=( $(find $REPOPATH -type d -mindepth 2 -maxdepth 2 -iname "*$SP_SEARCHPKG*" | sort) )
+  else
+    PKGPATH=( $(find $REPOPATH -type d -mindepth 2 -maxdepth 2 -name "$SP_SEARCHPKG" | sort) )
+  fi
+  if [[ -z $PKGPATH ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+show_results () {
+  # This displays the RESULTS array.
+  local SR_SHOW
+
+  echo
+  cleanecho "Results:"
+  for SR_SHOW in ${RESULTS[@]}; do
+    cleanecho $SR_SHOW
+  done
+}
+
+skip_line () {
+  # Skip commented and blank lines in a queuefile.
+  echo $1 | grep "^#" > /dev/null
+  if [[ $? == 0 ]]; then
+      return 0
+  fi
+  if [[ "$1" == "" ]]; then
+      return 0
+  fi
+  return 1
+}
+
+source_info () {
+  # source the base .info file and then one in SPGKDIR if found.
+  local SI_PKGINFO="$1"
+  local SI_BUILD="$2"
+
+  if search_pkg "$SI_PKGINFO"; then
+    . "$PKGPATH"/"$SI_PKGINFO".info
+    REPO_VER=$VERSION
+    REPOTYPE="$PKGPATH"
+    if [[ "$SI_BUILD" = "build" ]]; then
+      cp "$SPKGDIR"/"$SI_PKGINFO".{info,SlackBuild} "$TMPDIR"/"$SI_PKGINFO"/
+    fi
+    # Source a local .info in the 'override' SPKGDIR directory if found.
+    if [[ -e "$SPKGDIR"/"$SI_PKGINFO".info ]]; then
+      REPOTYPE="$SPKGDIR"
+      if [[ -z "$LOCALINFO" ]]; then
+        LOCALINFO+="\nSourcing files in $SPKGDIR for: "
+      fi
+      LOCALINFO+="$SI_PKGINFO "
+      . "$SPKGDIR"/"$SI_PKGINFO".info
+    fi
+  fi
+}
+
+usage () {
+  cat << EOF
+Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
+
+    -d            Download the source(s) for a package in \$REPOPATH.
+    -h            Additional help. Please read this.
+    -i            Download and install a package in \$REPOPATH.
+    -l            List installed packages in \$REPOPATH.
+    -p            Print the .info and README for a package in \$REPOPATH.
+    -q            Download and install repo packages in a /path/to/queuefile.
+    -r            Parse the list of REQUIRES for a package in \$REPOPATH.
+    -s            Search for a package in \$REPOPATH.
+    -u            Upgrade installed packages in \$REPOPATH.
+EOF
+}
+
+write_queuefile () {
+  local WQ_DATE WQ_ITEM WQ_QITEM
+
+  echo
+  echo "Writing queuefile in $SPKGDIR"
+  WQ_DATE=$(date +%Y%m%d-%H%M%S)
+  touch $SPKGDIR/$WQ_DATE.sqf
+  for WQ_ITEM in $(cat $BUILDFILE); do
+    WQ_QITEM=$(echo $WQ_ITEM | cut -d'|' -f1)
+    echo $WQ_QITEM >> $SPKGDIR/$WQ_DATE.sqf
+  done
+}
+
+# End functions and start of main script
+
+if [ $# -eq 0 ]; then
+  usage
+  exit 0
+fi
+
+CWD=$(pwd)
+
+if [ -z "$ARCH" ]; then
+  case "$( uname -m )" in
+    i?86) ARCH=i486 ;;
+    arm*) ARCH=arm ;;
+    *) ARCH=$( uname -m ) ;;
+  esac
+fi
+
+declare -g INSTALLED_VER MENU PKG_ARRAY REPO_VER
+
+while getopts "d:hi:lp:q:r:s:uw" OPT; do
+  PKG_ARRAY+=("$OPTARG")
+  case $OPT in
+    d ) # download
+      make_workdir
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      get_sources
+      ;;
+    h ) # help
+      help
+      ;;
+    i ) # install
+      check_root
+      make_workdir
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      get_sources
+      build_pkgs
+      show_results
+      ;;
+    l ) # list installed
+      MENU="cli"
+      make_workdir
+      get_installed
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      ;;
+    p ) # print .info and README
+      print_info "$PKG_ARRAY"
+      ;;
+    q ) # use queuefile
+      check_root
+      make_workdir
+      load_queues "$PKG_ARRAY"
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      ;;
+    r ) # show REQUIRES
+      MENU="cli"
+      make_workdir
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      ;;
+    s ) # search
+      search_list "$PKG_ARRAY"
+      ;;
+    u ) # upgrade installed
+      check_root
+      make_workdir
+      get_installed
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      get_sources
+      build_pkgs
+      show_results
+      ;;
+    w) # write queuefile
+      MENU="cli"
+      make_workdir
+      get_installed
+      parse_pkgarray "$PKG_ARRAY"
+      print_buildlist
+      write_queuefile
+      ;;
+    * ) # usage
+      usage
+      ;;
+  esac
+done
+shift $(($OPTIND - 1))
+
+cleanup
