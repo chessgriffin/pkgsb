@@ -5,7 +5,7 @@
 # Copyright 2013-2014 Chess Griffin <chess@chessgriffin.com>
 #
 # with bits from sbopkg which is:
-# Copyright 2007-2010, 2013 Chess Griffin <chess@chessgriffin.com
+# Copyright 2007-2010, 2013 Chess Griffin <chess@chessgriffin.com>
 # Copyright 2009-2011 Mauro Giachero <mauro.giachero@gmail.com>
 #                     slakmagik <slakmagik@gmail.com>
 #
@@ -47,12 +47,12 @@ INSTALL=${INSTALL:-1}
 OUTPUT=${OUTPUT:-/tmp}
 #
 # REPOPATH is the directory of where your SBo or other repository is located.
-REPOPATH=${REPOPATH:-/var/lib/sbopkg/SBo/14.1}
-#REPOPATH=${REPOPATH:-/home/chess/gitstuff/slackbuilds}
+# This must be changed for the script to work.
+REPOPATH=${REPOPATH:-/path/to/repo/14.1}
 #
 # SOURCEDIR is where downloaded source files are saved.  Needs to be writable
-# by the user running the script.
-SOURCEDIR=${SOURCEDIR:-/home/chess/sources}
+# by the user running the script. This must be changed for the script to work.
+SOURCEDIR=${SOURCEDIR:-/path/to/sources}
 #
 # SPKGDIR is the 'override' directory where you can put copies of SlackBuild
 # scripts and .info files and these will be sourced before building any
@@ -60,7 +60,7 @@ SOURCEDIR=${SOURCEDIR:-/home/chess/sources}
 # your repo directory.  You can also save build options to be passed to the
 # SlackBuild script in a simple text file named <package>.options with all
 # options on one line separated by spaces.
-SPKGDIR=${SPKGDIR:-/home/chess/spkg}
+SPKGDIR=${SPKGDIR:-/path/to/overrides}
 #
 # TMP is the temp directory.  A working directory will be created in $TMP.
 # Needs to be writable by the user running the script.
@@ -170,7 +170,6 @@ check_installed () {
       return 0
     fi
   done
-  #FI_INSTALLED_VER=""
   eval "INSTALLED_VER='$FI_INSTALLED_VER'"
 }
 
@@ -424,17 +423,11 @@ print_buildlist () {
   local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL
 
   echo
-  #for PB_ITEM in $(tac $DEPFILE); do
-  #  if ! grep -q "$PB_ITEM" $BUILDFILE; then
-  #    echo "$PB_ITEM" >> $BUILDFILE
-  #  fi
-  #done
   if [[ $MENU == "cli" ]]; then
     awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
     "Installed Version"; }'
     awk 'BEGIN {printf "%-25s %-13s %-25s\n", "-------", "------------", \
     "-----------------"; }'
-    #cat $BUILDFILE
     PB_COUNTER=0
     for PB_PRINT in $(cat $BUILDFILE); do
       PB_NAME=$(echo $PB_PRINT | cut -d'|' -f1)
