@@ -582,6 +582,14 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
 EOF
 }
 
+write_check () {
+  if [[ ! -w $SPKGDIR ]]; then
+    cleanecho "The override directory $SPKGDIR does not exist or is not \
+      writable by the user."
+    exit 1
+  fi
+}
+
 write_queuefile () {
   local WQ_DATE WQ_ITEM WQ_QITEM
 
@@ -672,6 +680,7 @@ while getopts "d:hi:lp:q:r:s:uw" OPT; do
       show_results
       ;;
     w) # write queuefile
+      write_check
       MENU="cli"
       make_workdir
       get_installed
