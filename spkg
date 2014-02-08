@@ -374,7 +374,7 @@ parse_pkgarray () {
   # Go through the REQUIRES to find all the packages.
   local PP_PARSELIST=("$1")
   local PP_APP="$2"
-  local PP_DEP PP_i PP_ITEM PP_ONOFF PP_SORT PP_VERCHK
+  local PP_DEP PP_i PP_ITEM PP_ONOFF PP_VERCHK
   BUILDFILE=$TMPDIR/build_requires.tmp
   DEPFILE=$TMPDIR/dep_requires.tmp
 
@@ -410,18 +410,18 @@ parse_pkgarray () {
       fi
       NOTES+="$PP_APP "
     fi
-    for PP_SORT in $(tac $DEPFILE); do
-      if ! grep -q "$PP_SORT" $BUILDFILE; then
-        echo "$PP_SORT" >> $BUILDFILE
-      fi
-    done
   done
 }
 
 print_buildlist () {
   # print the buildlist in cli or dialog depending on the option used.
-  local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL
+  local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL PB_SORT
 
+  for PB_SORT in $(tac $DEPFILE); do
+    if ! grep -q "$PB_SORT" $BUILDFILE; then
+      echo "$PB_SORT" >> $BUILDFILE
+    fi
+  done
   echo
   if [[ $MENU == "cli" ]]; then
     awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
