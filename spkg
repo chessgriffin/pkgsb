@@ -48,7 +48,7 @@ OUTPUT=${OUTPUT:-/tmp}
 #
 # REPOPATH is the directory of where your SBo or other repository is located.
 # This must be changed for the script to work.
-REPOPATH=${REPOPATH:-/path/to/repo/14.1}
+REPOPATH=${REPOPATH:-/path/to/repo/SBo/14.1}
 #
 # SOURCEDIR is where downloaded source files are saved.  Needs to be writable
 # by the user running the script. This must be changed for the script to work.
@@ -60,7 +60,7 @@ SOURCEDIR=${SOURCEDIR:-/path/to/sources}
 # your repo directory.  You can also save build options to be passed to the
 # SlackBuild script in a simple text file named <package>.options with all
 # options on one line separated by spaces.
-SPKGDIR=${SPKGDIR:-/path/to/overrides}
+SPKGDIR=${SPKGDIR:-/path/to/spkg}
 #
 # TMP is the temp directory.  A working directory will be created in $TMP.
 # Needs to be writable by the user running the script.
@@ -288,13 +288,13 @@ get_installed () {
 
   PKG_ARRAY=""
   for GI_ITEM in $(ls /var/log/packages | grep $TAG); do
-    printf "."
+    #printf "."
     GI_CHECK=${GI_ITEM%-*-*-*}
     echo "$GI_CHECK" >> $INSTALLED_LIST
   done
   for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
     PKG_ARRAY+="$GI_REV_ITEM "
-    printf "."
+    #printf "."
   done
 }
 
@@ -367,7 +367,7 @@ make_workdir () {
     TMPDIR="$TMP/spkg.${RANDOM}"
     mkdir -m 700 $TMPDIR || TMPDIR="FAILED"
   fi
-  printf "Building package list"
+  #printf "Building package list"
 }
 
 parse_pkgarray () {
@@ -378,10 +378,13 @@ parse_pkgarray () {
   BUILDFILE=$TMPDIR/build_requires.tmp
   DEPFILE=$TMPDIR/dep_requires.tmp
 
-  touch $BUILDFILE $DEPFILE
   for PP_DEP in ${PP_PARSELIST[@]}; do
-    printf "."
     if search_pkg "$PP_DEP"; then
+      if [[ ! -f $DEPFILE ]]; then
+        touch $BUILDFILE $DEPFILE
+        printf "Building package list"
+      fi
+      printf "."
       source_info "$PP_DEP"
       REPO_VER=$VERSION
       check_installed "$PP_DEP"
@@ -409,6 +412,8 @@ parse_pkgarray () {
         NOTES+="CAUTION!!! Found REQUIRES=%README%. See the README file for: "
       fi
       NOTES+="$PP_APP "
+    else
+      echo "Package \""$PP_DEP"\" not found."
     fi
   done
 }
@@ -417,6 +422,10 @@ print_buildlist () {
   # print the buildlist in cli or dialog depending on the option used.
   local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL PB_SORT
 
+  if [[ ! -s $DEPFILE ]]; then
+    cleanup
+    exit 0
+  fi
   for PB_SORT in $(tac $DEPFILE); do
     if ! grep -q "$PB_SORT" $BUILDFILE; then
       echo "$PB_SORT" >> $BUILDFILE
@@ -479,6 +488,8 @@ print_info () {
       more "$PKGPATH"/*.info
       echo
       more "$PKGPATH"/README
+    else
+      echo "Package \""$SR_ITEM"\" not found."
     fi
   done
 }
@@ -489,12 +500,12 @@ search_list () {
   local SL_i SL_ITEM SL_SRCHPKG
 
   for SL_ITEM in ${SL_SRCHLIST[@]}; do
+    echo
     cleanecho "Searching for \"$SL_ITEM\":"
     if search_pkg "$SL_ITEM" "general"; then
       for ((SL_i=0; SL_i<${#PKGPATH[*]}; SL_i++)); do
         echo ${PKGPATH[$SL_i]}
       done
-      echo
     else
       cleanecho "Cannot find $SL_ITEM."
     fi
@@ -576,9 +587,11 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -p            Print the .info and README for a package in \$REPOPATH.
     -q            Download and install packages in a /path/to/queuefile.
     -r            Print the list of REQUIRES for a package in \$REPOPATH.
-    -s            Search for a package in \$REPOPATH.
+    -s            Non case sensitive search for a package in \$REPOPATH.
     -u            Upgrade installed packages in \$REPOPATH.
     -w            Write a queuefile based on installed \$REPOPATH packages.
+
+Package names are case-sensitive but -s will search non case sensitive.
 EOF
 }
 
