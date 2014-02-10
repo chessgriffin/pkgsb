@@ -60,7 +60,7 @@ SOURCEDIR=${SOURCEDIR:-/path/to/sources}
 # your repo directory.  You can also save build options to be passed to the
 # SlackBuild script in a simple text file named <package>.options with all
 # options on one line separated by spaces.
-SPKGDIR=${SPKGDIR:-/path/to/spkg}
+SPKGDIR=${SPKGDIR:-/path/to/spkgdir}
 #
 # TMP is the temp directory.  A working directory will be created in $TMP.
 # Needs to be writable by the user running the script.
@@ -269,11 +269,6 @@ get_sources () {
       writable by the user."
     exit 1
   fi
-  if [[ ! -s $BUILDFILE ]]; then
-    cleanecho "No packages to install."
-    cleanup
-  fi
-  echo
   for GS_SRCPKG in $(cat $BUILDFILE); do
     cleanecho "Checking for $GS_SRCPKG sources."
     download_source "$GS_SRCPKG"
@@ -287,14 +282,15 @@ get_installed () {
   local INSTALLED_LIST=$TMPDIR/installed.tmp
 
   PKG_ARRAY=""
+  echo "Checking installed packages"
   for GI_ITEM in $(ls /var/log/packages | grep $TAG); do
-    #printf "."
+    printf "."
     GI_CHECK=${GI_ITEM%-*-*-*}
     echo "$GI_CHECK" >> $INSTALLED_LIST
   done
+  echo "Done."
   for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
     PKG_ARRAY+="$GI_REV_ITEM "
-    #printf "."
   done
 }
 
@@ -356,7 +352,7 @@ load_queues () {
         fi
       done < $LQ_FILE
     else
-      cleanecho "Can't find queuefile: $LQ_FILE.  Use full path."
+      cleanecho "Can't find queuefile: $LQ_FILE. Use full path."
     fi
   done
 }
@@ -367,7 +363,6 @@ make_workdir () {
     TMPDIR="$TMP/spkg.${RANDOM}"
     mkdir -m 700 $TMPDIR || TMPDIR="FAILED"
   fi
-  #printf "Building package list"
 }
 
 parse_pkgarray () {
@@ -413,68 +408,85 @@ parse_pkgarray () {
       fi
       NOTES+="$PP_APP "
     else
-      echo "Package \""$PP_DEP"\" not found."
+      if [[ -z "$NOT_FOUND" ]]; then
+        NOT_FOUND="Not found: "
+      fi
+      NOT_FOUND+="$PP_DEP "
     fi
   done
 }
 
 print_buildlist () {
   # print the buildlist in cli or dialog depending on the option used.
-  local PB_COUNTER PB_ITEM PB_PRINT PB_FINAL PB_SORT
+  local PB_COUNTER PB_FINAL PB_ITEM PB_PRINT PB_SORT
 
-  if [[ ! -s $DEPFILE ]]; then
-    cleanup
-    exit 0
-  fi
-  for PB_SORT in $(tac $DEPFILE); do
-    if ! grep -q "$PB_SORT" $BUILDFILE; then
-      echo "$PB_SORT" >> $BUILDFILE
-    fi
-  done
-  echo
-  if [[ $MENU == "cli" ]]; then
-    awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
-    "Installed Version"; }'
-    awk 'BEGIN {printf "%-25s %-13s %-25s\n", "-------", "------------", \
-    "-----------------"; }'
-    PB_COUNTER=0
-    for PB_PRINT in $(cat $BUILDFILE); do
-      PB_NAME=$(echo $PB_PRINT | cut -d'|' -f1)
-      PB_REPO=$(echo $PB_PRINT | cut -d'|' -f2)
-      PB_INSTLD=$(echo $PB_PRINT | cut -d'|' -f3)
-      awk -v PB_N="$PB_NAME" -v PB_R="$PB_REPO" -v PB_I="$PB_INSTLD" \
-        'BEGIN {printf "%-25s %-13s %-25s\n", PB_N, PB_R, PB_I; }'
-      PB_COUNTER=$((PB_COUNTER+1))
+  if [[ -f $DEPFILE ]]; then
+    for PB_SORT in $(tac $DEPFILE); do
+      if ! grep -q "$PB_SORT" $BUILDFILE; then
+        echo "$PB_SORT" >> $BUILDFILE
+      fi
     done
-    cleanecho "Total packages: $PB_COUNTER"
-    if [[ ! -z $NOTES ]]; then
-      cleanecho "$NOTES"
-    fi
-  else
-    sed -i "s/|/ /g" $BUILDFILE
-    while :; do
-      dialog --separate-output --title "spkg" --backtitle "$NOTES" \
-        --checklist "Select which packages to process. Repo version is in \
+    echo
+    if [[ $MENU == "cli" ]]; then
+      awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
+      "Installed Version"; }'
+      awk 'BEGIN {printf "%-25s %-13s %-25s\n", "-------", "------------", \
+      "-----------------"; }'
+      PB_COUNTER=0
+      for PB_PRINT in $(cat $BUILDFILE); do
+        PB_NAME=$(echo $PB_PRINT | cut -d'|' -f1)
+        PB_REPO=$(echo $PB_PRINT | cut -d'|' -f2)
+        PB_INSTLD=$(echo $PB_PRINT | cut -d'|' -f3)
+        awk -v PB_N="$PB_NAME" -v PB_R="$PB_REPO" -v PB_I="$PB_INSTLD" \
+          'BEGIN {printf "%-25s %-13s %-25s\n", PB_N, PB_R, PB_I; }'
+        PB_COUNTER=$((PB_COUNTER+1))
+      done
+      cleanecho "Total packages: $PB_COUNTER"
+      if [[ ! -z $NOTES ]]; then
+        cleanecho "$NOTES"
+      fi
+      if [[ ! -z $NOT_FOUND ]]; then
+        cleanecho "$NOT_FOUND"
+      fi
+    else
+      if [[ ! -z $NOT_FOUND ]]; then
+        cleanecho "$NOT_FOUND"
+        if ! ask_continue; then
+          cleanup
+        fi
+      fi
+      sed -i "s/|/ /g" $BUILDFILE
+      while :; do
+        dialog --separate-output --title "spkg - $TASK" --backtitle "$NOTES" \
+          --default-button "cancel" \
+          --checklist "Select which packages to process. Repo version is in \
 the left column and installed version is shown in the right column. \
 spkg tries to pre-select only those packages for which a newer version is in \
 the repo but the admin is strongly advised to double-check what is selected \
 and what is not selected. Note also that packages in the repo but installed \
 from other sources with different \$TAGS (e.g. _msb, _alien) may be listed \
 so be sure of your selections. Finally, if spkg finds a %README% then a \
-CAUTION note will be displayed at the top of the screen." \
-        20 0 15 --file $BUILDFILE 2> $TMPDIR/final_list.tmp
-      CHOICE=$?
-      case $CHOICE in
-        0)  rm $BUILDFILE
-            for PB_FINAL in $(cat $TMPDIR/final_list.tmp); do
-              echo "$PB_FINAL" | rev | cut -d- -f2-7 | rev >> $BUILDFILE
-            done
-            return
-            ;;
-        1)  cleanup
-            ;;
-      esac
-    done
+CAUTION note will be displayed at the top of the screen along with any \
+packages that were not found.." \
+          20 0 15 --file $BUILDFILE 2> $TMPDIR/final_list.tmp
+        CHOICE=$?
+        case $CHOICE in
+          0)  rm $BUILDFILE
+              for PB_FINAL in $(cat $TMPDIR/final_list.tmp); do
+                echo "$PB_FINAL" | rev | cut -d- -f2-7 | rev >> $BUILDFILE
+              done
+              return
+              ;;
+          1)  cleanup
+              ;;
+        esac
+      done
+    fi
+  else
+    if [[ ! -z $NOT_FOUND ]]; then
+      cleanecho "$NOT_FOUND"
+    fi
+    cleanup
   fi
 }
 
@@ -500,8 +512,7 @@ search_list () {
   local SL_i SL_ITEM SL_SRCHPKG
 
   for SL_ITEM in ${SL_SRCHLIST[@]}; do
-    echo
-    cleanecho "Searching for \"$SL_ITEM\":"
+    cleanecho "===Searching for \"$SL_ITEM\"==="
     if search_pkg "$SL_ITEM" "general"; then
       for ((SL_i=0; SL_i<${#PKGPATH[*]}; SL_i++)); do
         echo ${PKGPATH[$SL_i]}
@@ -639,6 +650,7 @@ while getopts "d:hi:lp:q:r:s:uw" OPT; do
   PKG_ARRAY+=("$OPTARG")
   case $OPT in
     d ) # download
+      TASK="download sources only"
       make_workdir
       parse_pkgarray "$PKG_ARRAY"
       print_buildlist
@@ -648,6 +660,7 @@ while getopts "d:hi:lp:q:r:s:uw" OPT; do
       help
       ;;
     i ) # install
+      TASK="download sources and install"
       check_root
       make_workdir
       parse_pkgarray "$PKG_ARRAY"
@@ -667,6 +680,7 @@ while getopts "d:hi:lp:q:r:s:uw" OPT; do
       print_info "$PKG_ARRAY"
       ;;
     q ) # use queuefile
+      TASK="download sources and install"
       check_root
       make_workdir
       load_queues "$PKG_ARRAY"
@@ -683,6 +697,7 @@ while getopts "d:hi:lp:q:r:s:uw" OPT; do
       search_list "$PKG_ARRAY"
       ;;
     u ) # upgrade installed
+      TASK="download sources and upgrade"
       check_root
       make_workdir
       get_installed
