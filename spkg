@@ -2,7 +2,7 @@
 #
 # spkg - a simple slackbuild script package builder
 #
-# Copyright 2013-2015 Chess Griffin <chess@chessgriffin.com>
+# Copyright 2013-2016 Chess Griffin <chess@chessgriffin.com>
 #
 # with bits from sbopkg which is:
 # Copyright 2007-2010, 2013 Chess Griffin <chess@chessgriffin.com>
@@ -248,7 +248,7 @@ EOF
 Found:    $DS_MD5CHK (downloaded $DS_SOURCEPKG)
 EOF
         if ask_continue; then
-          break
+          continue
         else
           cleanup
         fi
