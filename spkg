@@ -427,6 +427,8 @@ print_buildlist () {
       fi
     done
     echo
+    echo $(cat $BUILDFILE | sort) > $TMP/_test
+    mv $TMP/_test $BUILDFILE
     if [[ $MENU == "cli" ]]; then
       awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
       "Installed Version"; }'
