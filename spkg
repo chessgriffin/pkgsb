@@ -97,6 +97,26 @@ ask_continue () {
   done
 }
 
+browse_pkgs () {
+  local BRP_SRCH="$1"
+  local LIST
+
+  if [ "$BRP_SRCH" == "category" ]; then
+    unset BRP_SRCH
+  fi
+  #echo $(find "$REPOPATH"/"$BRP_SRCH" -type d -mindepth 1 -maxdepth 1 \
+  #  | sort) || echo "not found."
+  LIST+=$(find "$REPOPATH"/"$BRP_SRCH" -type d -mindepth 1 -maxdepth 1 \
+    2>/dev/null | sort)
+  if [ ! -z "${LIST[@]}" ]; then
+    echo "${LIST[@]}"
+  else
+    echo "Subdirectory $BRP_SRCH not found.  Try -b 'category' to see a list."
+    echo "Then, use -b 'name of category' to see the programs within in."
+    echo "For example, -b games."
+  fi
+}
+
 build_pkgs () {
   # The loop to build packages in BUILDFILE.
   local BP_BLD BP_BLDOPT BP_PACKAGE BP_SAVEOUTPUT BP_SRCE
@@ -593,6 +613,7 @@ usage () {
   cat << EOF
 Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
 
+    -b            Browse the subdirectories/categories in \$REPOPATH.
     -d            Download the source(s) for a package in \$REPOPATH.
     -h            Additional help. Please read this.
     -i            Download and install a package in \$REPOPATH.
@@ -648,9 +669,12 @@ fi
 
 declare -g INSTALLED_VER MENU PKG_ARRAY REPO_VER
 
-while getopts "d:hi:lp:q:r:s:uw" OPT; do
+while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
   PKG_ARRAY+=("$OPTARG")
   case $OPT in
+    b ) # browse
+      browse_pkgs "$PKG_ARRAY"
+      ;;
     d ) # download
       TASK="download sources only"
       make_workdir
