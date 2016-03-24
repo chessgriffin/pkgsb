@@ -302,16 +302,20 @@ get_installed () {
   local INSTALLED_LIST=$TMPDIR/installed.tmp
 
   PKG_ARRAY=""
-  echo "Checking installed packages"
+  echo "Checking installed packages."
   for GI_ITEM in $(ls /var/log/packages | grep $TAG); do
     printf "."
     GI_CHECK=${GI_ITEM%-*-*-*}
     echo "$GI_CHECK" >> $INSTALLED_LIST
   done
   echo "Done."
-  for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
-    PKG_ARRAY+="$GI_REV_ITEM "
-  done
+  if [[ -f $INSTALLED_LIST ]]; then
+    for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
+      PKG_ARRAY+="$GI_REV_ITEM "
+    done
+  else
+    echo "No installed packages found."
+  fi
 }
 
 help () {
