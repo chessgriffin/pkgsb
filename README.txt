@@ -42,6 +42,7 @@ Here is the command line output:
 
 Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
 
+    -b            Browse the subdirectories/categories in $REPOPATH.
     -d            Download the source(s) for a package in $REPOPATH.
     -h            Additional help. Please read this.
     -i            Download and install a package in $REPOPATH.
@@ -49,8 +50,10 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -p            Print the .info and README for a package in $REPOPATH.
     -q            Download and install packages in a /path/to/queuefile.
     -r            Print the list of REQUIRES for a package in $REPOPATH.
-    -s            Search for a package in $REPOPATH.
+    -s            Non case sensitive search for a package in $REPOPATH.
     -u            Upgrade installed packages in $REPOPATH.
     -w            Write a queuefile based on installed $REPOPATH packages.
+
+Package names are case-sensitive but -s will search non case sensitive.
 
 Enjoy!
