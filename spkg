@@ -412,10 +412,10 @@ parse_pkgarray () {
       else
         PP_VERCHK=$(echo $INSTALLED_VER | rev | cut -d- -f3 | rev)
       fi
-      if [[ "$REPO_VER" == "$PP_VERCHK" ]]; then
-        PP_ONOFF="OFF"
-      else
+      if [[ "$REPO_VER" > "$PP_VERCHK" ]]; then
         PP_ONOFF="ON"
+      else
+        PP_ONOFF="OFF"
       fi
       if [[ "$MENU" == "cli" ]]; then
         echo "$PP_DEP|$REPO_VER|$INSTALLED_VER" >> $DEPFILE
