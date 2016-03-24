@@ -447,8 +447,10 @@ print_buildlist () {
       fi
     done
     echo
-    echo $(cat $BUILDFILE | sort) > $TMP/_test
-    mv $TMP/_test $BUILDFILE
+    if [ ! -z $LIST ]; then
+      echo $(cat $BUILDFILE | sort) > $TMP/_test
+      mv $TMP/_test $BUILDFILE
+    fi
     if [[ $MENU == "cli" ]]; then
       awk 'BEGIN {printf "%-25s %-13s %-25s\n", "Package", "Repo Version", \
       "Installed Version"; }'
@@ -700,7 +702,7 @@ while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
       make_workdir
       get_installed
       parse_pkgarray "$PKG_ARRAY"
-      print_buildlist
+      print_buildlist "list"
       ;;
     p ) # print .info and README
       print_info "$PKG_ARRAY"
