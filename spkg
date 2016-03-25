@@ -407,12 +407,13 @@ parse_pkgarray () {
       source_info "$PP_DEP"
       #REPO_VER=$VERSION
       check_installed "$PP_DEP"
+      unset INSTALLED_VER
       if [[ -z $INSTALLED_VER ]]; then
         INSTALLED_VER="---"
       else
         PP_VERCHK=$(echo $INSTALLED_VER | rev | cut -d- -f3 | rev)
       fi
-      if [[ "$REPO_VER" > "$PP_VERCHK" ]]; then
+      if [[ "$REPO_VER" > "$PP_VERCHK" || "$INSTALLED_VER" == "---" ]]; then
         PP_ONOFF="ON"
       else
         PP_ONOFF="OFF"
