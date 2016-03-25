@@ -140,7 +140,7 @@ build_pkgs () {
     cd "$TMPDIR"/"$BP_BLD"
     for BP_SRCE in ${SOURCES[@]}; do
       cleanecho "Copying $BP_SRCE to work directory."
-      cp "$SOURCEDIR"/"$BP_SRCE" "$TMPDIR"/"$BP_BLD"
+      cp "$SOURCEDIR"/"$BP_BLD"/"$BP_SRCE" "$TMPDIR"/"$BP_BLD"
     done
     # Use any save options for the package found in the 'override' directory.
     if [[ -e "$SPKGDIR"/"$BP_BLD".options ]]; then
@@ -236,7 +236,8 @@ download_source () {
       fi
     fi
   fi
-  cd $SOURCEDIR
+  mkdir -p "$SOURCEDIR"/"$DS_PKG"
+  cd "$SOURCEDIR"/"$DS_PKG"
   for ((DS_i=0; DS_i<${#DS_SOURCEDL[*]}; DS_i++)); do
     # Get the source filename and put it in SOURCEPKG.
     DS_SOURCEPKG=$(echo "${DS_SOURCEDL[$DS_i]}" | sed 's/.*\///g')
