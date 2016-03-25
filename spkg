@@ -407,7 +407,7 @@ parse_pkgarray () {
       source_info "$PP_DEP"
       #REPO_VER=$VERSION
       check_installed "$PP_DEP"
-      unset INSTALLED_VER
+      #unset INSTALLED_VER
       if [[ -z $INSTALLED_VER ]]; then
         INSTALLED_VER="---"
       else
