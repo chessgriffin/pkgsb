@@ -101,19 +101,17 @@ browse_pkgs () {
   local BRP_SRCH="$1"
   local LIST
 
-  if [ "$BRP_SRCH" == "category" ]; then
+  if [ "$BRP_SRCH" == "list" ]; then
     unset BRP_SRCH
   fi
-  #echo $(find "$REPOPATH"/"$BRP_SRCH" -type d -mindepth 1 -maxdepth 1 \
-  #  | sort) || echo "not found."
   LIST+=$(find "$REPOPATH"/"$BRP_SRCH" -type d -mindepth 1 -maxdepth 1 \
     2>/dev/null | sort)
   if [ ! -z "${LIST[@]}" ]; then
     echo "${LIST[@]}"
   else
-    echo "Subdirectory $BRP_SRCH not found.  Try -b 'category' to see a list."
+    echo "Subdirectory $BRP_SRCH not found.  Try -b 'list' to see a list."
     echo "Then, use -b 'name of category' to see the programs within in."
-    echo "For example, -b games."
+    echo "For example, -b list, then -b games."
   fi
 }
 
@@ -303,13 +301,13 @@ get_installed () {
   local INSTALLED_LIST=$TMPDIR/installed.tmp
 
   PKG_ARRAY=""
-  echo "Checking installed packages."
+  #echo "Checking installed packages."
   for GI_ITEM in $(ls /var/log/packages | grep $TAG); do
-    printf "."
+    #printf "."
     GI_CHECK=${GI_ITEM%-*-*-*}
     echo "$GI_CHECK" >> $INSTALLED_LIST
   done
-  echo "Done."
+  #echo "Done."
   if [[ -f $INSTALLED_LIST ]]; then
     for GI_REV_ITEM in $(tac $INSTALLED_LIST); do
       PKG_ARRAY+="$GI_REV_ITEM "
@@ -406,9 +404,7 @@ parse_pkgarray () {
       fi
       printf "."
       source_info "$PP_DEP"
-      #REPO_VER=$VERSION
       check_installed "$PP_DEP"
-      #unset INSTALLED_VER
       if [[ -z $INSTALLED_VER ]]; then
         INSTALLED_VER="---"
       else
@@ -536,20 +532,39 @@ print_info () {
   done
 }
 
+reverse_requires () {
+  local RR_LIST=("$1")
+  local RR_ITEM RR_ALL
+
+  for RR_ITEM in ${RR_LIST[@]}; do
+    unset RR_ALL
+    echo "+--Reverse REQUIRES search for \"$RR_ITEM\"--+"
+    RR_ALL+=$(find "$REPOPATH" -name *.info | xargs grep REQUIRES | \
+      grep "REQUIRES=.*$RR_ITEM.*")
+    if [ -z "$RR_ALL" ]; then
+      cleanecho "Not found."
+    else
+      cleanecho "$RR_ALL"
+    fi
+    echo
+  done
+}
+
 search_list () {
   # Search for the packages given on the command line.
   local SL_SRCHLIST=("$1")
   local SL_i SL_ITEM SL_SRCHPKG
 
   for SL_ITEM in ${SL_SRCHLIST[@]}; do
-    cleanecho "===Searching for \"$SL_ITEM\"==="
+    cleanecho "+--Searching for \"$SL_ITEM\"--+"
     if search_pkg "$SL_ITEM" "general"; then
       for ((SL_i=0; SL_i<${#PKGPATH[*]}; SL_i++)); do
         echo ${PKGPATH[$SL_i]}
       done
     else
-      cleanecho "Cannot find $SL_ITEM."
+      cleanecho "Not found."
     fi
+    echo
   done
 }
 
@@ -629,9 +644,10 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -p            Print the .info and README for a package in \$REPOPATH.
     -q            Download and install packages in a /path/to/queuefile.
     -r            Print the list of REQUIRES for a package in \$REPOPATH.
+    -R            Reverse REQUIRES - where package is listed in REQUIRES.
     -s            Non case sensitive search for a package in \$REPOPATH.
     -u            Upgrade installed packages in \$REPOPATH.
-    -w            Write a queuefile based on installed \$REPOPATH packages.
+    -w            Write a queuefile for installed \$REPOPATH packages.
 
 Package names are case-sensitive but -s will search non case sensitive.
 EOF
@@ -677,7 +693,7 @@ fi
 
 declare -g INSTALLED_VER MENU PKG_ARRAY REPO_VER
 
-while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
+while getopts "b:d:hi:lp:q:r:R:s:uw" OPT; do
   PKG_ARRAY+=("$OPTARG")
   case $OPT in
     b ) # browse
@@ -706,6 +722,7 @@ while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
     l ) # list installed
       MENU="cli"
       make_workdir
+      echo "+--Listing installed packages--+"
       get_installed
       parse_pkgarray "$PKG_ARRAY"
       print_buildlist "list"
@@ -724,8 +741,13 @@ while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
     r ) # show REQUIRES
       MENU="cli"
       make_workdir
+      echo "+--Checking REQUIRES for \"$PKG_ARRAY\"--+"
       parse_pkgarray "$PKG_ARRAY"
       print_buildlist
+      ;;
+    R) # reverse REQUIRES search
+      menu="CLI"
+      reverse_requires "$PKG_ARRAY"
       ;;
     s ) # search
       search_list "$PKG_ARRAY"
@@ -734,6 +756,7 @@ while getopts "b:d:hi:lp:q:r:s:uw" OPT; do
       TASK="download sources and upgrade"
       check_root
       make_workdir
+      echo "+--Checking for updates to installed packages--+"
       get_installed
       parse_pkgarray "$PKG_ARRAY"
       print_buildlist
