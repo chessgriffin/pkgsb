@@ -14,9 +14,9 @@ This was the basis for working on spkg.  It is not a replacement for sbopkg
 per se and it does not have all the features of sbopkg.  But, it works for me
 and if it works for you, then that's cool.
 
-spkg is just a single Bash script of about 700 lines (and a good chunk of that
+spkg is just a single Bash script of about 800 lines (and a good chunk of that
 is the license, the user configuration section, and the usage and help
-functions).  The actual working part of the script is probably about 575 lines
+functions).  The actual working part of the script is probably about 650 lines
 so it is far smaller than sbopkg.
 
 Hopefully, it should be fairly self-explanatory.  The only required changes
@@ -37,6 +37,10 @@ to handle the syncing.  Again, spkg is supposed to be 'simple'.  :-)
 spkg supports sbopkg-style queuefile with the exception that it does not read
 build options passed in the queuefile after the pipe ('|') character.  Save
 those build options in a *.options file in the $SPKGDIR directory instead.
+
+DISCLAIMER: spkg is still alpha code under development.  It might destroy your
+machine, eat all your cookies, or leave your refrigerator door open.  Use at
+your own risk!
 
 Here is the command line output:
 
