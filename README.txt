@@ -50,9 +50,10 @@ Usage: spkg [OPTION] <packagename(s)> or <queuefile>:
     -p            Print the .info and README for a package in $REPOPATH.
     -q            Download and install packages in a /path/to/queuefile.
     -r            Print the list of REQUIRES for a package in $REPOPATH.
+    -R            Reverse REQUIRES - where package is listed in REQUIRES.
     -s            Non case sensitive search for a package in $REPOPATH.
     -u            Upgrade installed packages in $REPOPATH.
-    -w            Write a queuefile based on installed $REPOPATH packages.
+    -w            Write a queuefile for installed $REPOPATH packages.
 
 Package names are case-sensitive but -s will search non case sensitive.
 
