@@ -48,7 +48,7 @@ OUTPUT=${OUTPUT:-/tmp}
 #
 # REPOPATH is the directory of where your SBo or other repository is located.
 # This must be changed for the script to work.
-REPOPATH=${REPOPATH:-/path/to/repo/14.1}
+REPOPATH=${REPOPATH:-/path/to/repo/14.2}
 #
 # SOURCEDIR is where downloaded source files are saved.  Needs to be writable
 # by the user running the script. This must be changed for the script to work.
