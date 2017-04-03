@@ -1,7 +1,7 @@
 pkgsb
-====
+=====
 
-a simple slackbuild script package builder
+pkgsb:  a simple slackbuild script package builder
 
 pkgsb is designed to be a "light" variant to third-party tools like
 "sbopkg" for Slackware Linux.  I originally developed sbopkg and I think it
